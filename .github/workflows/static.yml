@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nandito's All-In-One Enterprise POS & ERP System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js & SheetJS for Analytics & Excel Exports -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; user-select: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Thermal Receipt Printing CSS */
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: #fff; color: #000; font-family: monospace; }
+            .receipt-box { width: 80mm; padding: 5px; font-size: 12px; }
+        }
+        .print-only { display: none; }
+        .touch-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased h-screen overflow-hidden flex flex-col">
+
+    <!-- Header Bar -->
+    <header class="bg-red-700 text-white shadow-md z-20 no-print flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-4 py-2 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-11 h-11 rounded-full bg-white p-0.5 shadow-md flex items-center justify-center border-2 border-yellow-400">
+                    <svg viewBox="0 0 500 500" class="w-full h-full">
+                        <circle cx="250" cy="250" r="240" fill="#ffffff" stroke="#e53e3e" stroke-width="12"/>
+                        <circle cx="250" cy="250" r="225" fill="#ffffff" stroke="#e53e3e" stroke-width="4"/>
+                        <path d="M250,110 C265,110 275,120 275,135 C285,125 300,135 290,150 C305,155 305,175 285,180 C270,180 260,170 250,170 Z" fill="#e53e3e"/>
+                        <path d="M250,170 C280,170 300,195 300,230 C300,265 275,280 250,280 C225,280 200,265 200,230 C200,195 220,170 250,170 Z" fill="#1a202c"/>
+                        <text x="250" y="340" font-family="'Arial Black', sans-serif" font-size="48" font-weight="900" fill="#e53e3e" text-anchor="middle">Nandito's</text>
+                        <text x="250" y="375" font-family="'Arial', sans-serif" font-size="20" font-weight="bold" fill="#000000" text-anchor="middle"> Peri-Peri Pero Pinoy </text>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-base md:text-lg leading-tight tracking-wide flex items-center gap-2">
+                        <span>Nandito's Desktop POS</span>
+                        <span class="text-[10px] bg-yellow-400 text-red-950 font-extrabold px-2 py-0.5 rounded-full uppercase">v4.5 PC Ready</span>
+                    </h1>
+                    <p class="text-[11px] text-red-100 flex items-center gap-1 font-medium">
+                        <i class="fa-solid fa-desktop text-yellow-300"></i>
+                        <span>Offline & PC Computer Optimized</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <div id="autoSaveBadge" class="hidden sm:flex items-center gap-2 bg-red-800/90 border border-red-500/60 text-white text-xs px-3 py-1 rounded-full shadow-inner">
+                    <span id="autoSaveDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                    <div class="flex flex-col text-[10px] font-mono leading-tight">
+                        <span id="autoSaveText" class="font-bold text-emerald-300">Auto-Save Ready</span>
+                        <span id="currentSerialTag" class="text-slate-200 text-[9px]">Serial: NDT-INITIAL</span>
+                    </div>
+                </div>
+
+                <div class="text-right hidden md:block">
+                    <div id="liveClock" class="font-mono text-xs font-bold">--:--:-- PM</div>
+                    <div id="liveDate" class="text-[10px] text-red-200 uppercase tracking-wider">---, --- --, ----</div>
+                </div>
+
+                <button onclick="downloadSerializedJsonBackup()" title="Backup Database File" class="touch-btn bg-red-800 hover:bg-red-900 text-white text-xs px-3 py-2 rounded-lg border border-red-600 transition flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span class="hidden md:inline font-semibold">Backup DB</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden relative">
+        <!-- Sidebar Navigation -->
+        <aside class="w-16 md:w-64 bg-slate-900 text-slate-300 flex flex-col justify-between no-print flex-shrink-0 border-r border-slate-800">
+            <div class="py-3">
+                <div class="px-4 mb-3 hidden md:block">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Modules</p>
+                </div>
+                <nav class="space-y-1.5 px-2">
+                    <button onclick="switchTab('pos')" id="nav-pos" class="touch-btn nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-xl font-medium text-xs md:text-sm transition bg-red-600 text-white shadow-md">
+                        <i class="fa-solid fa-cash-register text-lg w-6 text-center"></i>
+                        <span class="hidden md:inline font-bold">POS Terminal (F2)</span>
+                    </button>
+                    <button onclick="switchTab('sales')" id="nav-sales" class="touch-btn nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-xl font-medium text-xs md:text-sm transition hover:bg-slate-800 hover:text-white">
+                        <i class="fa-solid fa-receipt text-lg w-6 text-center"></i>
+                        <span class="hidden md:inline font-bold">Sales Register</span>
+                    </button>
+                    <button onclick="switchTab('inventory')" id="nav-inventory" class="touch-btn nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-xl font-medium text-xs md:text-sm transition hover:bg-slate-800 hover:text-white">
+                        <i class="fa-solid fa-boxes-stacked text-lg w-6 text-center"></i>
+                        <span class="hidden md:inline font-bold">Inventory & Menu</span>
+                    </button>
+                    <button onclick="switchTab('expenses')" id="nav-expenses" class="touch-btn nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-xl font-medium text-xs md:text-sm transition hover:bg-slate-800 hover:text-white">
+                        <i class="fa-solid fa-file-invoice-dollar text-lg w-6 text-center"></i>
+                        <span class="hidden md:inline font-bold">Expenses</span>
+                    </button>
+                    <button onclick="switchTab('analytics')" id="nav-analytics" class="touch-btn nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-xl font-medium text-xs md:text-sm transition hover:bg-slate-800 hover:text-white">
+                        <i class="fa-solid fa-chart-line text-lg w-6 text-center"></i>
+                        <span class="hidden md:inline font-bold">Analytics</span>
+                    </button>
+                    <button onclick="switchTab('settings')" id="nav-settings" class="touch-btn nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-xl font-medium text-xs md:text-sm transition hover:bg-slate-800 hover:text-white">
+                        <i class="fa-solid fa-palette text-lg w-6 text-center"></i>
+                        <span class="hidden md:inline font-bold">Settings & Passcode</span>
+                    </button>
+                </nav>
+            </div>
+
+            <div class="p-3 bg-slate-950 border-t border-slate-800 text-center text-xs">
+                <div class="hidden md:block">
+                    <p class="text-slate-400 text-[10px]">PC System Status:</p>
+                    <p class="font-bold text-emerald-400 text-xs">Ready / Standalone</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="flex-1 bg-slate-100 overflow-y-auto p-3 md:p-4 relative">
+
+            <!-- POS Panel -->
+            <section id="panel-pos" class="tab-panel grid grid-cols-1 lg:grid-cols-12 gap-3 h-full">
+                <div class="lg:col-span-7 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-2.5 border-b border-slate-200 bg-slate-900 flex flex-col gap-2">
+                        <div class="flex overflow-x-auto gap-2 pb-1 no-scrollbar w-full" id="categoryFilterContainer"></div>
+                        <div class="relative w-full">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
+                            <input type="text" id="posSearch" oninput="renderPosProducts()" placeholder="Search items (Press F2 to focus)..." class="w-full pl-9 pr-3 py-2 text-xs md:text-sm bg-slate-800 text-white placeholder-slate-400 border border-slate-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="flex-1 p-3 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 min-h-[350px]" id="posProductsGrid"></div>
+                </div>
+
+                <div class="lg:col-span-5 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-800 text-white p-3 flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-cart-shopping text-yellow-400"></i>
+                            <h2 class="font-bold text-xs md:text-sm">Current Order Basket</h2>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="promptClearEntireCart()" class="touch-btn bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold px-2 py-1 rounded border border-red-400 shadow-sm flex items-center gap-1">
+                                <i class="fa-solid fa-trash-can"></i> Clear (F8)
+                            </button>
+                            <span id="posCurrentSerialDisplay" class="text-[10px] font-mono bg-slate-700 px-2 py-0.5 rounded text-yellow-300 font-semibold">NDT-SERIAL</span>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 p-3 overflow-y-auto space-y-2 border-b border-slate-200 min-h-[200px]" id="cartItemsList"></div>
+
+                    <div class="p-3 md:p-4 bg-slate-50 space-y-3">
+                        <div class="space-y-1 text-xs">
+                            <div class="flex justify-between text-slate-600 font-semibold">
+                                <span>Subtotal</span>
+                                <span id="cartSubtotal" class="font-mono text-sm">₱0.00</span>
+                            </div>
+                            <div class="flex justify-between text-slate-600 items-center">
+                                <span class="flex items-center gap-1 font-semibold">
+                                    Discount (F9)
+                                    <button onclick="promptApplyDiscount()" class="touch-btn text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded font-bold hover:bg-red-200">Set Discount</button>
+                                </span>
+                                <span id="cartDiscount" class="font-semibold font-mono text-sm text-red-600">-₱0.00</span>
+                            </div>
+
+                            <div class="flex justify-between items-center text-slate-900 border-t-2 border-slate-300 pt-2 mt-2">
+                                <span class="font-extrabold text-sm uppercase">Grand Total</span>
+                                <span id="cartGrandTotal" class="text-2xl font-black font-mono text-red-700 tracking-tight">₱0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-200 space-y-2">
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 mb-1">Payment Method</label>
+                                    <select id="paymentMethod" class="w-full text-xs p-2.5 border border-slate-300 rounded-lg bg-white font-bold">
+                                        <option value="Cash">Cash (₱)</option>
+                                        <option value="GCash">GCash / Maya</option>
+                                        <option value="Card">Credit/Debit Card</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 mb-1">Cash Tendered (₱)</label>
+                                    <input type="number" id="cashTendered" oninput="calculateChange()" placeholder="0.00" class="w-full text-base p-2 border-2 border-slate-300 rounded-lg font-mono font-bold bg-white text-right text-slate-900 focus:border-red-500 outline-none">
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between items-center p-2.5 bg-emerald-50 rounded-lg border-2 border-emerald-300 text-emerald-900">
+                                <span class="font-extrabold text-xs uppercase">Change Due:</span>
+                                <span id="changeDue" class="font-mono text-xl font-black">₱0.00</span>
+                            </div>
+
+                            <button onclick="processCheckout()" class="touch-btn w-full py-3.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-extrabold rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-sm md:text-base tracking-wide">
+                                <i class="fa-solid fa-circle-check text-lg"></i>
+                                <span>COMPLETE TRANSACTION (ENTER)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sales Register Panel -->
+            <section id="panel-sales" class="tab-panel hidden space-y-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-3 items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-days text-red-600 text-xl"></i>
+                        <div>
+                            <h2 class="font-bold text-base text-slate-800">Sales Transactions Register</h2>
+                            <p class="text-xs text-slate-500">Itemized log with auto-generated Serial Numbers</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="date" id="salesDateFilter" onchange="renderSalesLog()" class="text-xs p-2 border border-slate-300 rounded-lg bg-white font-medium">
+                        <button onclick="setSalesFilterToday()" class="touch-btn text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-2 rounded-lg font-bold transition">Today</button>
+                        <button onclick="clearSalesFilter()" class="touch-btn text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-2 rounded-lg font-bold transition">All Time</button>
+                        <button onclick="exportSalesToExcel()" class="touch-btn text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-file-excel"></i> Export Excel
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl font-bold">₱</div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-semibold uppercase">Total Gross Revenue</p>
+                            <h3 id="salesSummaryTotal" class="text-2xl font-black text-slate-900 font-mono">₱0.00</h3>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl"><i class="fa-solid fa-barcode"></i></div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-semibold uppercase">Recorded Serials</p>
+                            <h3 id="salesSummaryCount" class="text-2xl font-black text-slate-900 font-mono">0 Orders</h3>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xl font-bold">₱</div>
+                        <div>
+                            <p class="text-xs text-slate-500 font-semibold uppercase">Discounts Approved</p>
+                            <h3 id="salesSummaryDiscounts" class="text-2xl font-black text-slate-900 font-mono">₱0.00</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-800 text-white uppercase tracking-wider text-[11px]">
+                                    <th class="p-3">Serial No.</th>
+                                    <th class="p-3">Date & Time</th>
+                                    <th class="p-3">Items Purchased</th>
+                                    <th class="p-3 text-right">Subtotal</th>
+                                    <th class="p-3 text-right">Discount</th>
+                                    <th class="p-3 text-right">Grand Total (₱)</th>
+                                    <th class="p-3 text-center">Payment</th>
+                                    <th class="p-3 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="salesTableBody" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Inventory Panel -->
+            <section id="panel-inventory" class="tab-panel hidden space-y-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-3 items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-boxes-stacked text-red-600 text-xl"></i>
+                        <h2 class="font-bold text-base text-slate-800">Menu Catalog, Stock & Item Reordering</h2>
+                    </div>
+                    <button onclick="promptAddProduct()" class="touch-btn bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> Add New Menu Item
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-800 text-white uppercase tracking-wider text-[11px]">
+                                    <th class="p-3 text-center">Reorder</th>
+                                    <th class="p-3">Product Name</th>
+                                    <th class="p-3">Category</th>
+                                    <th class="p-3 text-right">Price (₱)</th>
+                                    <th class="p-3 text-center">Stock Level</th>
+                                    <th class="p-3 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventoryTableBody" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Expenses Panel -->
+            <section id="panel-expenses" class="tab-panel hidden space-y-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-3 items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice-dollar text-red-600 text-xl"></i>
+                        <h2 class="font-bold text-base text-slate-800">Operational Expenses Tracker (₱)</h2>
+                    </div>
+                    <button onclick="promptAddExpense()" class="touch-btn bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> Record Expense Voucher
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-800 text-white uppercase tracking-wider text-[11px]">
+                                    <th class="p-3">Expense Serial</th>
+                                    <th class="p-3">Date</th>
+                                    <th class="p-3">Category</th>
+                                    <th class="p-3">Remarks</th>
+                                    <th class="p-3 text-right">Amount (₱)</th>
+                                    <th class="p-3 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expensesTableBody" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analytics Panel -->
+            <section id="panel-analytics" class="tab-panel hidden space-y-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-red-600"></i>
+                        <span>Business Analytics & Performance Dashboard</span>
+                    </h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-xs text-slate-600 mb-3 uppercase tracking-wider">Top Selling Items</h3>
+                        <div class="h-64"><canvas id="chartTopProducts"></canvas></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-xs text-slate-600 mb-3 uppercase tracking-wider">Revenue vs Operational Expenses</h3>
+                        <div class="h-64"><canvas id="chartFinancials"></canvas></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Panel -->
+            <section id="panel-settings" class="tab-panel hidden space-y-4 max-w-4xl mx-auto">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="border-b border-slate-200 pb-3 flex items-center justify-between">
+                        <div>
+                            <h2 class="font-bold text-lg text-slate-800">Security & Passcode Settings</h2>
+                            <p class="text-xs text-slate-500">Manager authorization passcode configuration.</p>
+                        </div>
+                        <i class="fa-solid fa-lock text-red-600 text-2xl"></i>
+                    </div>
+
+                    <form onsubmit="handlePasscodeUpdate(event)" class="space-y-3 pt-1">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Current Passcode</label>
+                                <input type="password" id="oldPasscodeInput" maxlength="6" required class="w-full text-xs p-2 border border-slate-300 rounded-lg font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">New Passcode</label>
+                                <input type="password" id="newPasscodeInput" maxlength="6" required class="w-full text-xs p-2 border border-slate-300 rounded-lg font-mono">
+                            </div>
+                        </div>
+                        <button type="submit" class="touch-btn bg-slate-800 hover:bg-slate-900 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition">Update Passcode</button>
+                    </form>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="border-b border-slate-200 pb-3">
+                        <h2 class="font-bold text-lg text-slate-800">Backup & Restore PC Database</h2>
+                        <p class="text-xs text-slate-500">Export structured database file to local PC disk drive.</p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="downloadSerializedJsonBackup()" class="touch-btn bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition flex items-center gap-2 shadow">
+                            <i class="fa-solid fa-file-arrow-down"></i> Export Auto-Save File (.JSON)
+                        </button>
+                        <button onclick="document.getElementById('importFileInput').click()" class="touch-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition flex items-center gap-2 shadow">
+                            <i class="fa-solid fa-file-arrow-up"></i> Import Data File (.JSON)
+                        </button>
+                        <input type="file" id="importFileInput" onchange="importJsonBackup(event)" accept=".json" class="hidden">
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Printable Receipt Container for Thermal Receipt Printer -->
+    <div id="thermalReceiptPrint" class="print-only receipt-box"></div>
+
+    <script>
+        const DEFAULT_PASSCODE = "062386";
+        let state = {
+            passcode: localStorage.getItem('ndt_passcode') || DEFAULT_PASSCODE,
+            activeCategory: 'All',
+            cart: [],
+            appliedDiscount: 0,
+            products: JSON.parse(localStorage.getItem('ndt_products')) || [
+                { id: '1', name: 'Quarter Peri Chicken', category: 'Flame Grilled', price: 189, stock: 45 },
+                { id: '2', name: 'Half Peri Chicken', category: 'Flame Grilled', price: 349, stock: 30 },
+                { id: '3', name: 'Whole Peri Chicken', category: 'Flame Grilled', price: 649, stock: 20 },
+                { id: '4', name: 'Peri Chicken Rice Bowl', category: 'Flame Grilled', price: 149, stock: 50 },
+                { id: '5', name: 'Sizzling Peri Sisig', category: 'Filipino Classics', price: 219, stock: 25 },
+                { id: '6', name: 'Crispy Pork Lechon Kawali', category: 'Filipino Classics', price: 239, stock: 20 },
+                { id: '7', name: 'Garlic Rice', category: 'Sides & Extra', price: 35, stock: 150 },
+                { id: '8', name: 'Peri-Peri Fries', category: 'Sides & Extra', price: 79, stock: 80 },
+                { id: '9', name: 'Iced Lemon Tea (L)', category: 'Beverages', price: 55, stock: 100 }
+            ],
+            categoryColors: JSON.parse(localStorage.getItem('ndt_category_colors')) || {
+                'Flame Grilled': '#e53e3e',
+                'Filipino Classics': '#d97706',
+                'Sides & Extra': '#2563eb',
+                'Beverages': '#059669'
+            },
+            sales: JSON.parse(localStorage.getItem('ndt_sales')) || [],
+            expenses: JSON.parse(localStorage.getItem('ndt_expenses')) || [],
+            currentSerial: generateSerial('NDT')
+        };
+
+        function generateSerial(prefix) {
+            const dateStr = new Date().toISOString().slice(2,10).replace(/-/g, '');
+            const rand = Math.floor(1000 + Math.random() * 9000);
+            return `${prefix}-${dateStr}-${rand}`;
+        }
+
+        function saveStateToLocalStorage() {
+            localStorage.setItem('ndt_passcode', state.passcode);
+            localStorage.setItem('ndt_products', JSON.stringify(state.products));
+            localStorage.setItem('ndt_category_colors', JSON.stringify(state.categoryColors));
+            localStorage.setItem('ndt_sales', JSON.stringify(state.sales));
+            localStorage.setItem('ndt_expenses', JSON.stringify(state.expenses));
+
+            const dot = document.getElementById('autoSaveDot');
+            if (dot) {
+                dot.classList.add('animate-ping');
+                setTimeout(() => dot.classList.remove('animate-ping'), 600);
+            }
+        }
+
+        function verifyPasscode() {
+            const input = prompt("Enter Manager Passcode:");
+            if (input === null) return false;
+            if (input === state.passcode) return true;
+            alert("Invalid Manager Passcode!");
+            return false;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-red-600', 'text-white', 'shadow-md');
+                btn.classList.add('hover:bg-slate-800', 'hover:text-white');
+            });
+
+            const activePanel = document.getElementById(`panel-${tabId}`);
+            if (activePanel) activePanel.classList.remove('hidden');
+
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-red-600', 'text-white', 'shadow-md');
+                activeNav.classList.remove('hover:bg-slate-800', 'hover:text-white');
+            }
+
+            if (tabId === 'sales') renderSalesLog();
+            if (tabId === 'inventory') renderInventoryTable();
+            if (tabId === 'expenses') renderExpensesTable();
+            if (tabId === 'analytics') renderAnalyticsCharts();
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('liveClock').textContent = now.toLocaleTimeString();
+            document.getElementById('liveDate').textContent = now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function getCategories() {
+            const cats = ['All'];
+            state.products.forEach(p => { if (!cats.includes(p.category)) cats.push(p.category); });
+            return cats;
+        }
+
+        function renderCategoryFilters() {
+            const container = document.getElementById('categoryFilterContainer');
+            if (!container) return;
+            container.innerHTML = getCategories().map(cat => {
+                const isActive = state.activeCategory === cat;
+                const catColor = state.categoryColors[cat] || '#475569';
+                const style = isActive ? `background-color: ${cat === 'All' ? '#e53e3e' : catColor}; color: white;` : `background-color: #1e293b; color: #cbd5e1; border: 1px solid #334155;`;
+                return `<button onclick="setCategoryFilter('${cat}')" style="${style}" class="touch-btn px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shadow-sm">${cat}</button>`;
+            }).join('');
+        }
+
+        function setCategoryFilter(cat) {
+            state.activeCategory = cat;
+            renderCategoryFilters();
+            renderPosProducts();
+        }
+
+        function renderPosProducts() {
+            const grid = document.getElementById('posProductsGrid');
+            const search = document.getElementById('posSearch').value.toLowerCase();
+
+            const filtered = state.products.filter(p => {
+                const matchesCat = state.activeCategory === 'All' || p.category === state.activeCategory;
+                const matchesSearch = p.name.toLowerCase().includes(search) || p.category.toLowerCase().includes(search);
+                return matchesCat && matchesSearch;
+            });
+
+            grid.innerHTML = filtered.map(p => {
+                const bg = state.categoryColors[p.category] || '#e53e3e';
+                const isOut = p.stock <= 0;
+                return `
+                    <div onclick="${isOut ? '' : `addToCart('${p.id}')`}" class="touch-btn bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between cursor-pointer hover:border-slate-400 transition relative ${isOut ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}">
+                        <div class="h-2 w-full" style="background-color: ${bg}"></div>
+                        <div class="p-3 flex-1 flex flex-col justify-between">
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded text-white" style="background-color: ${bg}">${p.category}</span>
+                                <h3 class="font-extrabold text-xs md:text-sm text-slate-800 mt-1.5 leading-snug">${p.name}</h3>
+                            </div>
+                            <div class="mt-3 flex items-center justify-between">
+                                <span class="font-black text-sm text-red-700 font-mono">₱${p.price.toFixed(2)}</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${isOut ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'}">${isOut ? 'OUT OF STOCK' : `Stock: ${p.stock}`}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addToCart(productId) {
+            const product = state.products.find(p => p.id === productId);
+            if (!product || product.stock <= 0) return;
+
+            const existing = state.cart.find(item => item.id === productId);
+            if (existing) {
+                if (existing.qty + 1 > product.stock) {
+                    alert(`Stock limit reached (${product.stock}).`);
+                    return;
+                }
+                existing.qty++;
+            } else {
+                state.cart.push({ id: product.id, name: product.name, price: product.price, qty: 1 });
+            }
+            renderCart();
+        }
+
+        function updateCartQty(id, delta) {
+            const item = state.cart.find(i => i.id === id);
+            const product = state.products.find(p => p.id === id);
+
+            if (!item || !product) return;
+
+            if (delta < 0 && item.qty === 1) {
+                if (verifyPasscode()) state.cart = state.cart.filter(i => i.id !== id);
+            } else {
+                if (delta > 0 && item.qty + delta > product.stock) {
+                    alert(`Stock limit reached (${product.stock}).`);
+                    return;
+                }
+                item.qty += delta;
+            }
+            renderCart();
+        }
+
+        function promptClearEntireCart() {
+            if (state.cart.length === 0) return;
+            if (verifyPasscode()) {
+                state.cart = [];
+                state.appliedDiscount = 0;
+                renderCart();
+            }
+        }
+
+        function promptApplyDiscount() {
+            if (state.cart.length === 0) return;
+            if (verifyPasscode()) {
+                const input = prompt("Enter Discount Amount (₱):", state.appliedDiscount.toString());
+                if (input !== null) {
+                    const val = parseFloat(input);
+                    if (!isNaN(val) && val >= 0) {
+                        state.appliedDiscount = val;
+                        renderCart();
+                    }
+                }
+            }
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cartItemsList');
+            if (state.cart.length === 0) {
+                container.innerHTML = `
+                    <div class="h-full flex flex-col items-center justify-center text-slate-400 py-10">
+                        <i class="fa-solid fa-cart-flatbed text-3xl mb-2"></i>
+                        <p class="text-xs font-semibold">Cart is currently empty</p>
+                    </div>`;
+            } else {
+                container.innerHTML = state.cart.map(item => `
+                    <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs">
+                        <div class="flex-1 pr-2">
+                            <p class="font-bold text-slate-800">${item.name}</p>
+                            <p class="text-slate-500 font-mono text-[11px]">₱${item.price.toFixed(2)} x ${item.qty} = <strong class="text-slate-900">₱${(item.price * item.qty).toFixed(2)}</strong></p>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="updateCartQty('${item.id}', -1)" class="touch-btn bg-slate-200 hover:bg-slate-300 text-slate-800 w-6 h-6 rounded font-extrabold flex items-center justify-center text-xs">-</button>
+                            <span class="font-bold w-5 text-center font-mono">${item.qty}</span>
+                            <button onclick="updateCartQty('${item.id}', 1)" class="touch-btn bg-slate-200 hover:bg-slate-300 text-slate-800 w-6 h-6 rounded font-extrabold flex items-center justify-center text-xs">+</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            const subtotal = state.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            const grandTotal = Math.max(0, subtotal - state.appliedDiscount);
+
+            document.getElementById('cartSubtotal').textContent = `₱${subtotal.toFixed(2)}`;
+            document.getElementById('cartDiscount').textContent = `-₱${state.appliedDiscount.toFixed(2)}`;
+            document.getElementById('cartGrandTotal').textContent = `₱${grandTotal.toFixed(2)}`;
+            calculateChange();
+        }
+
+        function calculateChange() {
+            const subtotal = state.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            const grandTotal = Math.max(0, subtotal - state.appliedDiscount);
+            const cash = parseFloat(document.getElementById('cashTendered').value) || 0;
+            const change = cash - grandTotal;
+
+            const changeEl = document.getElementById('changeDue');
+            if (change >= 0) {
+                changeEl.textContent = `₱${change.toFixed(2)}`;
+                changeEl.className = 'font-mono text-xl font-black text-emerald-700';
+            } else {
+                changeEl.textContent = `Need ₱${Math.abs(change).toFixed(2)}`;
+                changeEl.className = 'font-mono text-base font-black text-red-600';
+            }
+        }
+
+        function processCheckout() {
+            if (state.cart.length === 0) return alert("Basket is empty!");
+
+            const subtotal = state.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            const grandTotal = Math.max(0, subtotal - state.appliedDiscount);
+            const method = document.getElementById('paymentMethod').value;
+            const cash = parseFloat(document.getElementById('cashTendered').value) || 0;
+
+            if (method === 'Cash' && cash < grandTotal) return alert("Insufficient Cash!");
+
+            state.cart.forEach(item => {
+                const prod = state.products.find(p => p.id === item.id);
+                if (prod) prod.stock -= item.qty;
+            });
+
+            const transaction = {
+                serial: state.currentSerial,
+                timestamp: new Date().toISOString(),
+                items: [...state.cart],
+                subtotal: subtotal,
+                discount: state.appliedDiscount,
+                grandTotal: grandTotal,
+                method: method,
+                cashTendered: method === 'Cash' ? cash : grandTotal,
+                change: method === 'Cash' ? Math.max(0, cash - grandTotal) : 0
+            };
+
+            state.sales.unshift(transaction);
+            
+            // Print receipt output
+            printReceipt(transaction);
+
+            state.cart = [];
+            state.appliedDiscount = 0;
+            state.currentSerial = generateSerial('NDT');
+            document.getElementById('cashTendered').value = '';
+
+            document.getElementById('posCurrentSerialDisplay').textContent = state.currentSerial;
+            document.getElementById('currentSerialTag').textContent = `Serial: ${state.currentSerial}`;
+
+            saveStateToLocalStorage();
+            renderPosProducts();
+            renderCart();
+        }
+
+        function printReceipt(tx) {
+            const receiptHtml = `
+                <div style="text-align: center;">
+                    <h2>Nandito's Peri-Peri</h2>
+                    <p>Serial: ${tx.serial}</p>
+                    <p>Date: ${new Date(tx.timestamp).toLocaleString()}</p>
+                    <hr/>
+                </div>
+                ${tx.items.map(i => `<div>${i.name} x${i.qty} - ₱${(i.price * i.qty).toFixed(2)}</div>`).join('')}
+                <hr/>
+                <div>Subtotal: ₱${tx.subtotal.toFixed(2)}</div>
+                <div>Discount: ₱${tx.discount.toFixed(2)}</div>
+                <div><strong>TOTAL: ₱${tx.grandTotal.toFixed(2)}</strong></div>
+                <div>Method: ${tx.method}</div>
+                <div>Cash: ₱${tx.cashTendered.toFixed(2)}</div>
+                <div>Change: ₱${tx.change.toFixed(2)}</div>
+                <hr/>
+                <div style="text-align: center;"><p>Thank you for dining with us!</p></div>
+            `;
+            const receiptContainer = document.getElementById('thermalReceiptPrint');
+            receiptContainer.innerHTML = receiptHtml;
+            window.print();
+        }
+
+        function renderSalesLog() {
+            const filterDate = document.getElementById('salesDateFilter').value;
+            const tbody = document.getElementById('salesTableBody');
+
+            let filteredSales = state.sales;
+            if (filterDate) filteredSales = state.sales.filter(s => s.timestamp.startsWith(filterDate));
+
+            let totalGross = 0;
+            let totalDiscounts = 0;
+
+            tbody.innerHTML = filteredSales.map(s => {
+                totalGross += s.grandTotal;
+                totalDiscounts += s.discount;
+
+                const dateObj = new Date(s.timestamp);
+                const itemsFormatted = s.items.map(i => `${i.name} (x${i.qty})`).join(', ');
+
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-3 font-mono font-bold text-red-700">${s.serial}</td>
+                        <td class="p-3 font-medium text-slate-600">${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                        <td class="p-3 font-medium text-slate-800 max-w-xs truncate">${itemsFormatted}</td>
+                        <td class="p-3 text-right font-mono text-slate-600">₱${s.subtotal.toFixed(2)}</td>
+                        <td class="p-3 text-right font-mono text-red-600">-₱${s.discount.toFixed(2)}</td>
+                        <td class="p-3 text-right font-mono font-bold text-slate-900">₱${s.grandTotal.toFixed(2)}</td>
+                        <td class="p-3 text-center"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300">${s.method}</span></td>
+                        <td class="p-3 text-center">
+                            <button onclick="voidTransaction('${s.serial}')" class="touch-btn text-red-600 font-bold text-xs"><i class="fa-solid fa-trash-can"></i> Void</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('salesSummaryTotal').textContent = `₱${totalGross.toFixed(2)}`;
+            document.getElementById('salesSummaryCount').textContent = `${filteredSales.length} Orders`;
+            document.getElementById('salesSummaryDiscounts').textContent = `₱${totalDiscounts.toFixed(2)}`;
+        }
+
+        function voidTransaction(serial) {
+            if (verifyPasscode()) {
+                const tx = state.sales.find(s => s.serial === serial);
+                if (tx) {
+                    tx.items.forEach(item => {
+                        const prod = state.products.find(p => p.id === item.id);
+                        if (prod) prod.stock += item.qty;
+                    });
+                    state.sales = state.sales.filter(s => s.serial !== serial);
+                    saveStateToLocalStorage();
+                    renderSalesLog();
+                    renderPosProducts();
+                }
+            }
+        }
+
+        function setSalesFilterToday() {
+            document.getElementById('salesDateFilter').value = new Date().toISOString().slice(0, 10);
+            renderSalesLog();
+        }
+
+        function clearSalesFilter() {
+            document.getElementById('salesDateFilter').value = '';
+            renderSalesLog();
+        }
+
+        function exportSalesToExcel() {
+            if (state.sales.length === 0) return alert("No sales to export!");
+            const exportData = state.sales.map(s => ({
+                'Serial Number': s.serial,
+                'Date & Time': new Date(s.timestamp).toLocaleString(),
+                'Items': s.items.map(i => `${i.name} (x${i.qty})`).join('; '),
+                'Subtotal (PHP)': s.subtotal,
+                'Discount (PHP)': s.discount,
+                'Grand Total (PHP)': s.grandTotal,
+                'Method': s.method
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sales");
+            XLSX.writeFile(wb, `Sales_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        function renderInventoryTable() {
+            const tbody = document.getElementById('inventoryTableBody');
+            tbody.innerHTML = state.products.map((p, idx) => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-3 text-center space-x-1">
+                        <button onclick="moveProductOrder(${idx}, -1)" class="touch-btn bg-slate-200 hover:bg-slate-300 text-slate-800 w-6 h-6 rounded font-bold text-xs">↑</button>
+                        <button onclick="moveProductOrder(${idx}, 1)" class="touch-btn bg-slate-200 hover:bg-slate-300 text-slate-800 w-6 h-6 rounded font-bold text-xs">↓</button>
+                    </td>
+                    <td class="p-3 font-bold text-slate-800">${p.name}</td>
+                    <td class="p-3 font-medium text-slate-600"><span class="px-2 py-0.5 rounded text-[10px] font-bold text-white" style="background-color: ${state.categoryColors[p.category] || '#64748b'}">${p.category}</span></td>
+                    <td class="p-3 text-right font-mono font-bold text-slate-900">₱${p.price.toFixed(2)}</td>
+                    <td class="p-3 text-center">
+                        <span class="font-mono font-bold px-2.5 py-1 rounded-full text-xs ${p.stock < 10 ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}">${p.stock}</span>
+                    </td>
+                    <td class="p-3 text-center space-x-2">
+                        <button onclick="promptEditProduct('${p.id}')" class="touch-btn text-blue-600 font-bold">Edit</button>
+                        <button onclick="promptDeleteProduct('${p.id}')" class="touch-btn text-red-600 font-bold">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function moveProductOrder(index, direction) {
+            const target = index + direction;
+            if (target < 0 || target >= state.products.length) return;
+            const temp = state.products[index];
+            state.products[index] = state.products[target];
+            state.products[target] = temp;
+            saveStateToLocalStorage();
+            renderInventoryTable();
+            renderPosProducts();
+        }
+
+        function promptAddProduct() {
+            const name = prompt("Product Name:");
+            if (!name) return;
+            const category = prompt("Category:", "Flame Grilled");
+            if (!category) return;
+            const price = parseFloat(prompt("Price (₱):", "100"));
+            if (isNaN(price)) return;
+            const stock = parseInt(prompt("Stock Level:", "50"), 10);
+            if (isNaN(stock)) return;
+
+            state.products.push({ id: Date.now().toString(), name, category, price, stock });
+            saveStateToLocalStorage();
+            renderInventoryTable();
+            renderCategoryFilters();
+            renderPosProducts();
+        }
+
+        function promptEditProduct(id) {
+            const product = state.products.find(p => p.id === id);
+            if (!product) return;
+            const name = prompt("Product Name:", product.name);
+            if (!name) return;
+            const price = parseFloat(prompt("Price (₱):", product.price.toString()));
+            if (isNaN(price)) return;
+            const stock = parseInt(prompt("Stock Level:", product.stock.toString()), 10);
+            if (isNaN(stock)) return;
+
+            product.name = name;
+            product.price = price;
+            product.stock = stock;
+            saveStateToLocalStorage();
+            renderInventoryTable();
+            renderPosProducts();
+        }
+
+        function promptDeleteProduct(id) {
+            if (verifyPasscode()) {
+                state.products = state.products.filter(p => p.id !== id);
+                saveStateToLocalStorage();
+                renderInventoryTable();
+                renderPosProducts();
+            }
+        }
+
+        function renderExpensesTable() {
+            const tbody = document.getElementById('expensesTableBody');
+            tbody.innerHTML = state.expenses.map(exp => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-3 font-mono font-bold text-slate-800">${exp.serial}</td>
+                    <td class="p-3 text-slate-600">${exp.date}</td>
+                    <td class="p-3 font-semibold text-slate-700">${exp.category}</td>
+                    <td class="p-3 text-slate-600">${exp.remarks || '-'}</td>
+                    <td class="p-3 text-right font-mono font-bold text-red-600">₱${exp.amount.toFixed(2)}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="promptDeleteExpense('${exp.serial}')" class="touch-btn text-red-600 font-bold">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function promptAddExpense() {
+            const category = prompt("Expense Category:");
+            if (!category) return;
+            const amount = parseFloat(prompt("Amount (₱):"));
+            if (isNaN(amount)) return;
+            state.expenses.unshift({ serial: generateSerial('EXP'), date: new Date().toISOString().slice(0, 10), category, amount, remarks: '' });
+            saveStateToLocalStorage();
+            renderExpensesTable();
+        }
+
+        function promptDeleteExpense(serial) {
+            if (verifyPasscode()) {
+                state.expenses = state.expenses.filter(e => e.serial !== serial);
+                saveStateToLocalStorage();
+                renderExpensesTable();
+            }
+        }
+
+        function renderAnalyticsCharts() {
+            const map = {};
+            state.sales.forEach(s => s.items.forEach(i => map[i.name] = (map[i.name] || 0) + i.qty));
+            new Chart(document.getElementById('chartTopProducts').getContext('2d'), {
+                type: 'bar',
+                data: { labels: Object.keys(map), datasets: [{ data: Object.values(map), backgroundColor: '#e53e3e' }] }
+            });
+
+            const rev = state.sales.reduce((sum, s) => sum + s.grandTotal, 0);
+            const exp = state.expenses.reduce((sum, e) => sum + e.amount, 0);
+            new Chart(document.getElementById('chartFinancials').getContext('2d'), {
+                type: 'doughnut',
+                data: { labels: ['Revenue', 'Expenses'], datasets: [{ data: [rev, exp], backgroundColor: ['#059669', '#dc2626'] }] }
+            });
+        }
+
+        function handlePasscodeUpdate(e) {
+            e.preventDefault();
+            const oldP = document.getElementById('oldPasscodeInput').value;
+            const newP = document.getElementById('newPasscodeInput').value;
+            if (oldP !== state.passcode) return alert("Incorrect current passcode!");
+            state.passcode = newP;
+            saveStateToLocalStorage();
+            alert("Passcode Updated!");
+        }
+
+        function downloadSerializedJsonBackup() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", `POS_Backup_${state.currentSerial}.json`);
+            dlAnchor.click();
+        }
+
+        function importJsonBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    state = JSON.parse(e.target.result);
+                    saveStateToLocalStorage();
+                    location.reload();
+                } catch (err) { alert("Invalid File format."); }
+            };
+            reader.readAsText(file);
+        }
+
+        // PC Keyboard Shortcuts Listener
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'F2') {
+                e.preventDefault();
+                switchTab('pos');
+                document.getElementById('posSearch').focus();
+            } else if (e.key === 'F8') {
+                e.preventDefault();
+                promptClearEntireCart();
+            } else if (e.key === 'F9') {
+                e.preventDefault();
+                promptApplyDiscount();
+            } else if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                processCheckout();
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setInterval(updateClock, 1000);
+            updateClock();
+            renderCategoryFilters();
+            renderPosProducts();
+            renderCart();
+        });
+    </script>
+</body>
+</html>
